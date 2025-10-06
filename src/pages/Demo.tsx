@@ -3,365 +3,446 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Send, Bot, User, Zap, MessageSquare, Star, ShoppingCart, Info } from 'lucide-react';
+import { Label } from '@/components/ui/label'; // <--- Added Label import
 
-interface Message {
+import {
+  PhoneCall,
+  PhoneOff,
+  Pause,
+  Play,
+  Settings,
+  Bot, // Changed User to Bot for AI agent
+  User, // Kept User for customer
+  BarChart2,
+  Target,
+  MessageSquareText,
+  Clock,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles // Added Sparkles for AI flavor
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { easeInOut } from "framer-motion"; // Explicitly import easeInOut
+
+interface TranscriptEntry {
   id: string;
+  speaker: 'agent' | 'customer';
   text: string;
-  sender: 'user' | 'ai';
   timestamp: Date;
-  typing?: boolean;
 }
 
 const Demo = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: "Hello! I'm Audixa AI, your intelligent customer engagement assistant. I can help with product recommendations, answer questions, and guide you through your shopping experience. How can I assist you today?",
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
-  const [inputValue, setInputValue] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'paused' | 'ended'>('idle');
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
+  const [currentSentiment, setCurrentSentiment] = useState<'neutral' | 'positive' | 'negative'>('neutral');
+  const [talkTime, setTalkTime] = useState(0);
+  const [intentsDetected, setIntentsDetected] = useState<string[]>([]);
+  const [agentPersona, setAgentPersona] = useState('Empathetic Support Agent'); // Renamed inputValue
+  const [callObjective, setCallObjective] = useState('Resolve query & improve CSAT');
+  const transcriptEndRef = useRef<HTMLDivElement>(null);
+  const talkTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const predefinedAgentResponses = [
+    "Hello, thank you for calling Audixa. How may I assist you today?",
+    "I understand you're looking for product information. Could you tell me which product category you're interested in?",
+    "Certainly, I can help with that. Are you calling about an existing order or looking to place a new one?",
+    "I'm detecting an intent related to technical support. Would you like me to connect you with a specialist, or can I help troubleshoot?",
+    "That's a great question! I'm happy to provide more details. What specifically would you like to know about our services?",
+    "Thank you for that information. I'm processing your request now. Please bear with me for a moment.",
+    "Your satisfaction is important to us. Is there anything else I can assist you with today?",
+    "Thank you for using Audixa's AI calling system. Have a wonderful day!"
+  ];
+
+  const predefinedCustomerResponses = [
+    "Hi, I'm calling about a recent purchase.",
+    "I need to know more about your new AI integration features.",
+    "My product isn't working as expected, can you help?",
+    "What are your current pricing plans?",
+    "I want to speak to a human representative.",
+    "This is great, thank you so much for your help!",
+    "Goodbye, that was helpful."
+  ];
+
+  const simulatedAgentThinkTime = () => 1000 + Math.random() * 2000; // 1-3 seconds
+  const simulatedCustomerThinkTime = () => 500 + Math.random() * 1500; // 0.5-2 seconds
+
+  const startCall = () => {
+    setCallStatus('calling');
+    setTranscript([]);
+    setTalkTime(0);
+    setIntentsDetected([]);
+    setCurrentSentiment('neutral');
+
+    const initialAgentMessage: TranscriptEntry = {
+      id: Date.now().toString(),
+      speaker: 'agent',
+      text: "Hello, thank you for calling Audixa. How may I assist you today?",
+      timestamp: new Date(),
+    };
+    setTranscript([initialAgentMessage]);
+
+    talkTimeIntervalRef.current = setInterval(() => {
+      setTalkTime(prev => prev + 1);
+    }, 1000);
+
+    // Start automated conversation
+    setTimeout(() => simulateConversation(), simulatedAgentThinkTime());
+  };
+
+  const simulateConversation = () => {
+    if (callStatus !== 'calling') return;
+
+    // Simulate Agent response
+    const nextAgentResponse = predefinedAgentResponses[Math.floor(Math.random() * predefinedAgentResponses.length)];
+    const newAgentMessage: TranscriptEntry = {
+      id: Date.now().toString() + 'agent',
+      speaker: 'agent',
+      text: nextAgentResponse,
+      timestamp: new Date(),
+    };
+
+    setTranscript(prev => [...prev, newAgentMessage]);
+    updateSentimentAndIntents(nextAgentResponse);
+
+    // Simulate Customer response after agent
+    setTimeout(() => {
+      if (callStatus === 'calling') {
+        const nextCustomerResponse = predefinedCustomerResponses[Math.floor(Math.random() * predefinedCustomerResponses.length)];
+        const newCustomerMessage: TranscriptEntry = {
+          id: Date.now().toString() + 'customer',
+          speaker: 'customer',
+          text: nextCustomerResponse,
+          timestamp: new Date(),
+        };
+        setTranscript(prev => [...prev, newCustomerMessage]);
+        updateSentimentAndIntents(nextCustomerResponse);
+
+        // Continue conversation or end
+        if (transcript.length < 10 && !nextCustomerResponse.toLowerCase().includes('goodbye')) { // Limit conversation length
+          setTimeout(() => simulateConversation(), simulatedCustomerThinkTime());
+        } else {
+          endCall();
+        }
+      }
+    }, simulatedAgentThinkTime());
+  };
+
+
+  const pauseCall = () => {
+    setCallStatus('paused');
+    if (talkTimeIntervalRef.current) {
+      clearInterval(talkTimeIntervalRef.current);
+    }
+  };
+
+  const resumeCall = () => {
+    setCallStatus('calling');
+    talkTimeIntervalRef.current = setInterval(() => {
+      setTalkTime(prev => prev + 1);
+    }, 1000);
+    // Restart conversation simulation if paused in the middle
+    setTimeout(() => simulateConversation(), simulatedAgentThinkTime());
+  };
+
+  const endCall = () => {
+    setCallStatus('ended');
+    if (talkTimeIntervalRef.current) {
+      clearInterval(talkTimeIntervalRef.current);
+    }
+    const finalMessage: TranscriptEntry = {
+      id: Date.now().toString() + 'end',
+      speaker: 'agent',
+      text: "Thank you for using Audixa's AI calling system. Have a wonderful day!",
+      timestamp: new Date(),
+    };
+    setTranscript(prev => [...prev, finalMessage]);
+  };
+
+  const updateSentimentAndIntents = (messageText: string) => {
+    // Simplified sentiment analysis
+    if (messageText.toLowerCase().includes('thank you') || messageText.toLowerCase().includes('great') || messageText.toLowerCase().includes('helpful')) {
+      setCurrentSentiment('positive');
+    } else if (messageText.toLowerCase().includes('not working') || messageText.toLowerCase().includes('problem') || messageText.toLowerCase().includes('unhappy')) {
+      setCurrentSentiment('negative');
+    } else {
+      setCurrentSentiment('neutral');
+    }
+
+    // Simplified intent detection
+    if (messageText.toLowerCase().includes('product')) {
+      setIntentsDetected(prev => Array.from(new Set([...prev, 'Product Inquiry'])));
+    }
+    if (messageText.toLowerCase().includes('order') || messageText.toLowerCase().includes('purchase')) {
+      setIntentsDetected(prev => Array.from(new Set([...prev, 'Order Status'])));
+    }
+    if (messageText.toLowerCase().includes('support') || messageText.toLowerCase().includes('help')) {
+      setIntentsDetected(prev => Array.from(new Set([...prev, 'Customer Support'])));
+    }
+    if (messageText.toLowerCase().includes('pricing') || messageText.toLowerCase().includes('cost')) {
+      setIntentsDetected(prev => Array.from(new Set([...prev, 'Pricing Inquiry'])));
+    }
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [transcript]);
 
-  // Simulated AI responses
-  const getAIResponse = (userMessage: string): string => {
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('help') || lowerMessage.includes('support')) {
-      return "I'm here to help! I can assist with product recommendations, order tracking, account questions, and general support. What specific area would you like help with?";
-    }
-    
-    if (lowerMessage.includes('product') || lowerMessage.includes('recommend')) {
-      return "I'd be happy to recommend products! Based on our conversation and your interests, I can suggest items that match your needs. What type of product are you looking for? For example: electronics, clothing, home goods, etc.";
-    }
-    
-    if (lowerMessage.includes('price') || lowerMessage.includes('cost')) {
-      return "I can help you find products within your budget! Our current promotions include 20% off electronics and free shipping on orders over $50. What's your price range for the items you're interested in?";
-    }
-    
-    if (lowerMessage.includes('order') || lowerMessage.includes('track')) {
-      return "I can help you track your order! Please provide your order number, and I'll give you real-time updates on your shipment status and estimated delivery time.";
-    }
-    
-    if (lowerMessage.includes('return') || lowerMessage.includes('refund')) {
-      return "Our return policy allows for returns within 30 days of purchase. I can help you start a return, check your return status, or answer questions about our refund process. What would you like to do?";
-    }
-    
-    if (lowerMessage.includes('account') || lowerMessage.includes('profile')) {
-      return "I can help with account-related questions including updating your profile, managing preferences, viewing order history, and setting up notifications. What would you like to update?";
-    }
-    
-    if (lowerMessage.includes('thank') || lowerMessage.includes('thanks')) {
-      return "You're very welcome! I'm here whenever you need assistance. Is there anything else I can help you with today?";
-    }
-    
-    if (lowerMessage.includes('bye') || lowerMessage.includes('goodbye')) {
-      return "Thank you for trying Audixa AI! Have a great day, and feel free to come back anytime. We're here 24/7 to assist you!";
-    }
-    
-    // Default responses for general queries
-    const defaultResponses = [
-      "That's an interesting question! Based on your inquiry, I can provide personalized assistance. Could you tell me a bit more about what you're looking for?",
-      "I understand you're asking about that. Let me help you find the best solution. What specific outcome are you hoping to achieve?",
-      "Great question! I have access to comprehensive product and service information. Could you provide a bit more context so I can give you the most relevant assistance?",
-      "I'm here to help with that! To provide you with the most accurate and helpful response, could you share a few more details about your specific needs?"
-    ];
-    
-    return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
-  };
-
-  const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      text: inputValue,
-      sender: 'user',
-      timestamp: new Date()
+  useEffect(() => {
+    // Cleanup interval on component unmount
+    return () => {
+      if (talkTimeIntervalRef.current) {
+        clearInterval(talkTimeIntervalRef.current);
+      }
     };
+  }, []);
 
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsTyping(true);
-
-    // Simulate AI thinking time
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        text: getAIResponse(userMessage.text),
-        sender: 'ai',
-        timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 1000 + Math.random() * 2000); // Random delay between 1-3 seconds
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const getSentimentBadge = () => {
+    switch (currentSentiment) {
+      case 'positive':
+        return <Badge className="bg-green-500 text-white"><ThumbsUp className="w-4 h-4 mr-1" /> Positive</Badge>;
+      case 'negative':
+        return <Badge className="bg-red-500 text-white"><ThumbsDown className="w-4 h-4 mr-1" /> Negative</Badge>;
+      default:
+        return <Badge variant="secondary">Neutral</Badge>;
     }
   };
 
-  const quickActions = [
-    { text: "Recommend products for me", icon: ShoppingCart },
-    { text: "Help with my order", icon: MessageSquare },
-    { text: "Tell me about your features", icon: Info },
-    { text: "Customer support options", icon: Star }
-  ];
+  const formatTalkTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const heroVariants = {
+    hidden: { opacity: 0, y: 50 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: easeInOut } }, // Updated ease
+  };
+
+  const cardVariants = {
+    hidden: { opacity: 0, scale: 0.9 },
+    visible: { opacity: 1, scale: 1, transition: { duration: 0.6, ease: easeInOut } }, // Updated ease
+  };
 
   return (
     <div className="min-h-screen bg-background pt-20">
       {/* Hero Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 hero-gradient">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
-            Try Audixa AI Demo
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto mb-8">
-            Experience the power of AI-driven customer engagement. Chat with our intelligent assistant 
-            and see how it can transform your customer interactions.
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
-            <Badge variant="secondary">Real-time AI</Badge>
-            <Badge variant="secondary">Natural Conversation</Badge>
-            <Badge variant="secondary">Smart Recommendations</Badge>
-            <Badge variant="secondary">24/7 Available</Badge>
+      <motion.section
+        variants={heroVariants}
+        initial="hidden"
+        whileInView="visible" // Changed animate to whileInView for robustness
+        viewport={{ once: true, amount: 0.2 }} // Added viewport
+        className="relative py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-600 to-purple-700 text-white overflow-hidden"
+      >
+        <div className="max-w-7xl mx-auto text-center relative z-10">
+          <motion.h1
+            initial={{ y: -50, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }} // Changed animate to whileInView
+            viewport={{ once: true, amount: 0.5 }} // Added viewport
+            transition={{ duration: 0.8 }}
+            className="text-4xl md:text-6xl font-extrabold mb-4 drop-shadow-lg"
+          >
+            Audixa AI Calling Demo
+          </motion.h1>
+          <motion.p
+            initial={{ y: 50, opacity: 0 }}
+            whileInView={{ y: 0, opacity: 1 }} // Changed animate to whileInView
+            viewport={{ once: true, amount: 0.5 }} // Added viewport
+            transition={{ delay: 0.3, duration: 0.8 }}
+            className="text-xl md:text-2xl font-light max-w-3xl mx-auto mb-8"
+          >
+            Experience dynamic, AI-powered customer calls with real-time sentiment analysis, intent detection, and automated responses.
+          </motion.p>
+          <div className="flex flex-wrap justify-center gap-3">
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30 px-4 py-2 text-sm">Real-time AI</Badge>
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30 px-4 py-2 text-sm">Sentiment Analysis</Badge>
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30 px-4 py-2 text-sm">Intent Detection</Badge>
+            <Badge variant="secondary" className="bg-white/20 text-white backdrop-blur-sm border-white/30 px-4 py-2 text-sm">24/7 Automation</Badge>
           </div>
         </div>
-      </section>
+      </motion.section>
 
       {/* Demo Interface */}
       <section className="py-16 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Chat Interface */}
-            <div className="lg:col-span-2">
-              <Card className="card-feature h-96 flex flex-col">
-                {/* Chat Header */}
-                <div className="flex items-center justify-between p-4 border-b border-border">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                      <Bot className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">Audixa AI Assistant</h3>
-                      <p className="text-sm text-muted-foreground">Online • Responds instantly</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
-                    Live Demo
-                  </Badge>
-                </div>
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Call Simulation Card */}
+          <motion.div variants={cardVariants} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} className="lg:col-span-2">
+            <Card className="h-[600px] flex flex-col rounded-3xl shadow-xl border-2 border-primary/10 relative overflow-hidden group">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100/30 to-purple-100/30 blur-2xl opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
 
-                {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+              {/* Call Header */}
+              <div className="flex items-center justify-between p-4 border-b border-border bg-card relative z-10 rounded-t-3xl">
+                <div className="flex items-center space-x-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center 
+                      ${callStatus === 'calling' ? 'bg-green-500' : 'bg-gray-400'} text-white animate-pulse-slow`}>
+                    <PhoneCall className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground">Audixa AI Call in Progress</h3>
+                    <p className="text-sm text-muted-foreground">Status: <Badge variant="secondary" className={`${callStatus === 'calling' ? 'bg-green-100 text-green-800' : callStatus === 'paused' ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>{callStatus.toUpperCase()}</Badge></p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">{formatTalkTime(talkTime)}</span>
+                </div>
+              </div>
+
+              {/* Transcript Area */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-background/50 relative z-10">
+                <AnimatePresence>
+                  {transcript.map((entry) => (
+                    <motion.div
+                      key={entry.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      transition={{ duration: 0.3 }}
+                      className={`flex ${entry.speaker === 'customer' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div className={`flex items-start space-x-2 max-w-[80%] ${
-                        message.sender === 'user' ? 'flex-row-reverse space-x-reverse' : ''
+                        entry.speaker === 'customer' ? 'flex-row-reverse space-x-reverse' : ''
                       }`}>
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          message.sender === 'user' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'bg-gradient-primary'
+                          entry.speaker === 'customer'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white'
                         }`}>
-                          {message.sender === 'user' ? (
-                            <User className="w-4 h-4 text-white" />
-                          ) : (
-                            <Bot className="w-4 h-4 text-white" />
-                          )}
+                          {entry.speaker === 'customer' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
                         </div>
-                        <div className={`rounded-lg p-3 ${
-                          message.sender === 'user'
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground'
-                        }`}>
-                          <p className="text-sm">{message.text}</p>
-                          <p className="text-xs opacity-70 mt-1">
-                            {message.timestamp.toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
+                        <div className="rounded-lg p-3 bg-card shadow-sm border border-border">
+                          <p className="text-sm text-foreground">{entry.text}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {entry.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   ))}
-                  
-                  {/* Typing Indicator */}
-                  {isTyping && (
-                    <div className="flex justify-start">
-                      <div className="flex items-start space-x-2">
-                        <div className="w-8 h-8 bg-gradient-primary rounded-full flex items-center justify-center">
-                          <Bot className="w-4 h-4 text-white" />
-                        </div>
-                        <div className="bg-muted rounded-lg p-3">
-                          <div className="flex space-x-1">
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce"></div>
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                            <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                </AnimatePresence>
+                <div ref={transcriptEndRef} />
+              </div>
+
+              {/* Call Controls */}
+              <div className="p-4 border-t border-border bg-card relative z-10 rounded-b-3xl">
+                <div className="flex justify-center items-center space-x-4">
+                  {callStatus === 'idle' && (
+                    <Button onClick={startCall} size="lg" className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg">
+                      <PhoneCall className="w-5 h-5 mr-2" /> Start Call
+                    </Button>
                   )}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Input Area */}
-                <div className="p-4 border-t border-border">
-                  <div className="flex space-x-2">
-                    <Input
-                      value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
-                      onKeyPress={handleKeyPress}
-                      placeholder="Type your message here..."
-                      className="flex-1"
-                      disabled={isTyping}
-                    />
-                    <Button 
-                      onClick={handleSendMessage}
-                      disabled={!inputValue.trim() || isTyping}
-                      className="px-4"
-                    >
-                      <Send className="w-4 h-4" />
+                  {callStatus === 'calling' && (
+                    <>
+                      <Button onClick={pauseCall} variant="outline" size="lg" className="px-6 py-3 rounded-full shadow-md">
+                        <Pause className="w-5 h-5 mr-2" /> Pause
+                      </Button>
+                      <Button onClick={endCall} size="lg" className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-full shadow-lg">
+                        <PhoneOff className="w-5 h-5 mr-2" /> End Call
+                      </Button>
+                    </>
+                  )}
+                  {callStatus === 'paused' && (
+                    <>
+                      <Button onClick={resumeCall} size="lg" className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg">
+                        <Play className="w-5 h-5 mr-2" /> Resume Call
+                      </Button>
+                      <Button onClick={endCall} variant="outline" size="lg" className="px-6 py-3 rounded-full shadow-md">
+                        <PhoneOff className="w-5 h-5 mr-2" /> End Call
+                      </Button>
+                    </>
+                  )}
+                   {callStatus === 'ended' && (
+                    <Button onClick={startCall} size="lg" className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-full shadow-lg">
+                      <PhoneCall className="w-5 h-5 mr-2" /> Restart Demo
                     </Button>
-                  </div>
-                </div>
-              </Card>
-
-              {/* Quick Actions */}
-              <div className="mt-6">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">Quick Actions</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {quickActions.map((action, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setInputValue(action.text)}
-                      className="justify-start text-sm"
-                    >
-                      <action.icon className="w-4 h-4 mr-2" />
-                      {action.text}
-                    </Button>
-                  ))}
+                  )}
                 </div>
               </div>
-            </div>
+            </Card>
+          </motion.div>
 
-            {/* Demo Info Sidebar */}
-            <div className="space-y-6">
-              {/* Demo Features */}
-              <Card className="card-feature">
-                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
-                  <Zap className="w-5 h-5 mr-2" />
-                  Demo Features
+          {/* Sidebar - Analytics and Configuration */}
+          <div className="space-y-6">
+            {/* Real-time Analytics */}
+            <motion.div variants={cardVariants} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} className="flex-1">
+              <Card className="p-6 rounded-3xl shadow-xl border-2 border-accent/10 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-100/30 to-teal-100/30 blur-2xl opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
+                <h3 className="text-2xl font-bold text-foreground mb-4 flex items-center relative z-10">
+                  <BarChart2 className="w-6 h-6 mr-3 text-accent" />
+                  Real-time Analytics
                 </h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
-                    <span className="text-muted-foreground">Natural language processing</span>
+                <div className="space-y-4 relative z-10">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Current Sentiment:</span>
+                    {getSentimentBadge()}
                   </div>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
-                    <span className="text-muted-foreground">Product recommendations</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Talk Time:</span>
+                    <Badge variant="secondary">{formatTalkTime(talkTime)}</Badge>
                   </div>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
-                    <span className="text-muted-foreground">Customer support simulation</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Intents Detected:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {intentsDetected.length > 0 ? (
+                        intentsDetected.map((intent, idx) => (
+                          <Badge key={idx} variant="outline" className="text-sm bg-blue-100 text-blue-800">{intent}</Badge>
+                        ))
+                      ) : (
+                        <Badge variant="outline" className="text-sm text-gray-500">None</Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
-                    <span className="text-muted-foreground">Intent detection</span>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="w-2 h-2 bg-primary rounded-full mr-3"></div>
-                    <span className="text-muted-foreground">Real-time responses</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Agent Efficiency:</span>
+                    <Badge variant="secondary">High</Badge>
                   </div>
                 </div>
               </Card>
+            </motion.div>
 
-              {/* Demo Stats */}
-              <Card className="card-feature">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Demo Metrics</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Response Time</span>
-                    <span className="text-sm font-medium text-foreground">&lt; 2s</span>
+            {/* AI Agent Configuration */}
+            <motion.div variants={cardVariants} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} className="flex-1">
+              <Card className="p-6 rounded-3xl shadow-xl border-2 border-indigo-100/10 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-100/30 to-indigo-100/30 blur-2xl opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
+                <h3 className="text-2xl font-bold text-foreground mb-4 flex items-center relative z-10">
+                  <Settings className="w-6 h-6 mr-3 text-indigo-500" />
+                  Agent Configuration
+                </h3>
+                <div className="space-y-4 relative z-10">
+                  <div>
+                    <Label htmlFor="agent-persona" className="text-muted-foreground">Agent Persona</Label>
+                    <Input id="agent-persona" placeholder="e.g., Empathetic Support Agent" value={agentPersona} onChange={(e) => setAgentPersona(e.target.value)} />
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Accuracy</span>
-                    <span className="text-sm font-medium text-foreground">95%</span>
+                  <div>
+                    <Label htmlFor="agent-objective" className="text-muted-foreground">Call Objective</Label>
+                    <Input id="agent-objective" placeholder="e.g., Resolve query & improve CSAT" value={callObjective} onChange={(e) => setCallObjective(e.target.value)} />
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Languages</span>
-                    <span className="text-sm font-medium text-foreground">20+</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Availability</span>
-                    <span className="text-sm font-medium text-foreground">24/7</span>
-                  </div>
+                  <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">Apply Settings</Button>
                 </div>
               </Card>
+            </motion.div>
 
-              {/* Next Steps */}
-              <Card className="card-feature">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Ready to Get Started?</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  This is just a glimpse of what Audixa AI can do. Get the full experience with your own data and customizations.
+            {/* Next Steps */}
+            <motion.div variants={cardVariants} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} className="flex-1">
+              <Card className="p-6 rounded-3xl shadow-xl border-2 border-primary/10 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-100/30 to-purple-100/30 blur-2xl opacity-50 group-hover:opacity-70 transition-opacity duration-300"></div>
+                <h3 className="text-2xl font-bold text-foreground mb-4 relative z-10">Ready for a Deep Dive?</h3>
+                <p className="text-muted-foreground mb-6 relative z-10">
+                  This demo offers a glimpse. Experience Audixa AI with your own data, custom agents, and advanced features tailored to your business needs.
                 </p>
-                <div className="space-y-3">
-                  <Button className="w-full" asChild>
+                <div className="space-y-3 relative z-10">
+                  <Button className="w-full btn-hero" asChild>
                     <a href="/contact">
-                      Schedule Full Demo
+                      <PhoneCall className="w-4 h-4 mr-2" /> Schedule Full Demo
                     </a>
                   </Button>
                   <Button variant="outline" className="w-full" asChild>
                     <a href="/features">
-                      View All Features
+                      <Target className="w-4 h-4 mr-2" /> Explore Features
                     </a>
                   </Button>
                 </div>
               </Card>
-
-              {/* Contact Info */}
-              <Card className="card-feature">
-                <h3 className="text-lg font-semibold text-foreground mb-4">Questions?</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Need help or have questions about this demo? We're here to help!
-                </p>
-                <div className="space-y-2 text-sm">
-                  <div className="text-muted-foreground">
-                    Email: demo@audixa.ai
-                  </div>
-                  <div className="text-muted-foreground">
-                    Phone: +1 (555) 123-4567
-                  </div>
-                  <div className="text-muted-foreground">
-                    Live chat available 24/7
-                  </div>
-                </div>
-              </Card>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>

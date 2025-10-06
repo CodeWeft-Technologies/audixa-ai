@@ -254,4 +254,8 @@ Professional SaaS design system inspired by retail.ai
     60% { content: '..'; }
     80%, 100% { content: '...'; }
   }
+  html {
+    scroll-behavior: smooth;
+  }
+  
 }
