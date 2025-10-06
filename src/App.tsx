@@ -14,7 +14,7 @@ import Pricing from "./pages/Pricing"; // Updated to relative path
 import FAQ from "./pages/FAQ"; // Updated to relative path
 import AuthPage from "./pages/AuthPage"; // Updated to relative path
 import NotFound from "./pages/NotFound"; // Updated to relative path
-import Documentation from "./pages/documentation";
+import Documentation from "./pages/Documentation.tsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfServices from "./pages/terms_of_services";
 import ScrollToHashElement from "./components/ScrollToHashElement";
